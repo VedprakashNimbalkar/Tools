@@ -1,0 +1,83 @@
+Automatic configure basic Zabbix monitoring for newly created VMs if requested.
+
+
+Installing Zabbix-agent on a volume using bellow steps...
+-----------------------------------------------------------
+apt-get install build-essential
+apt-get install unzip
+apt-get install curl-dev
+mkdir /usrdatazbx/zabbixagent-2.2.5 /usrdatazbx/zabbixagent-2.2.5/pid/ /usrdatazbx/zabbixagent-2.2.5/logs/
+chown jersey:servicesusrgroup /usrdata/logs
+groupadd zabbix
+useradd -d /home/zabbix/ -m -g zabbix -N -c 'User to Run zabbix agent' zabbix
+chown zabbix:zabbix /usrdatazbx/zabbixagent-2.2.5/pid/ /usrdatazbx/zabbixagent-2.2.5/logs/
+tar -xvf zabbix_2.2.5.orig.tar.gz
+cd zabbix-2.2.5/
+./configure --enable-agent --enable-ipv6 --with-net-snmp --with-libcurl --with-libxml2 --prefix=/usrdatazbx/zabbixagent-2.2.5
+make && make install
+vi /usrdatazbx/zabbixagent-2.2.5/etc/zabbix_agentd.conf
+
+Change following parameters
+
+PidFile=/usrdatazbx/zabbixagent-2.2.5/pid/zabbix_agentd.pid
+LogFile=/usrdatazbx/zabbixagent-2.2.5/logs/zabbix_agentd.log
+DebugLevel=3
+Server=<zabbix-ServerIP>
+ListenPort=<ZabbixServer Port>
+StartAgents=5
+ServerActive=<zabbix-ServerIP for auto register>
+Hostname=
+HostnameItem=system.hostname
+BufferSend=5
+BufferSize=500
+MaxLinesPerSecond=100
+Timeout=5
+AllowRoot=0
+HostMetadataItem=system.uname
+-----------------------------------------------------------------------------------------------------------
+
+Create snapshot of above volume and attached to the server while creating.
+
+Bellow script should configure as post script while creating server..
+----------------------------------------------------------------------------------
+mkdir /usrdatazbx
+mount –t ext4 /dev/vdd /usrdatazbx
+echo "/dev/vdc	/usrdatazbx	ext4	defaults	0	2 " >> /etc/fstab
+mount -a
+groupadd zabbix
+useradd -d /home/zabbix/ -m -g zabbix -N -c 'User to Run zabbix agent' zabbix
+ln -s /usrdatazbx/zabbixagent-2.2.5/sbin/zabbix_agentd /etc/init.d/zabbix_agentd
+update-rc.d zabbix_agentd defaults
+ufw allow <ZabbixServer Port>
+service zabbix_agentd start
+------------------------------------------------------------------------------------
+
+Need to add action on zabbix server to auto register active agents.
+
+ Now you need to configure the front-end. Create 2 actions. 
+ The first action:
+
+    Name: Linux host auto-registration
+    Conditions: Host meta data like Linux
+    Operations: Link to templates: Template OS Linux
+
+ The second action:
+
+    Name: Windows host auto-registration
+    Conditions: Host meta data like Windows
+    Operations: Link to templates: Template OS Windows
+
+ Create an action in the front-end, using the above mentioned hard-to-guess secret code to disallow unwanted hosts:
+
+    Name: Auto registration action Linux
+    Conditions:
+        Type of calculation: AND
+        Condition (A): Host meta data like Linux
+        Condition (B): Host meta data like <some encryption which added in agent.conf file>
+    Operations:
+        Send message to users: Admin via all media
+        Add to host groups: Linux servers
+        Link to templates: Template OS Linux
+
+
+

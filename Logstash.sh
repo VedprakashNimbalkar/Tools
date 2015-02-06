@@ -4,7 +4,7 @@ wget -O - http://packages.elasticsearch.org/GPG-KEY-elasticsearch | apt-key add 
 
 apt-get install logstash -y
 
-cat <<EOT >> /etc/logstash/conf.d/agenttest.conf
+cat <<EOT >> /etc/logstash/conf.d/agent.conf
 input {
         file {
                 type => "message"
